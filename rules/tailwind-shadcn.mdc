@@ -1,0 +1,26 @@
+---
+description: Tailwind CSS v4 and shadcn/ui conventions, including the CSS-first theme, v4 class renames, semantic tokens and cn()
+globs: **/*.tsx,**/*.css,components.json
+alwaysApply: false
+---
+
+# Tailwind CSS v4 + shadcn/ui
+
+## Tailwind v4
+- Configuration is CSS-first: `@import "tailwindcss";` in the global stylesheet, design tokens in `@theme { ... }`. Don't create a `tailwind.config.js`; if the project already has one, it's loaded with `@config`.
+- Theme variables become utilities: `--color-brand-500` gives `bg-brand-500`, `text-brand-500` and so on. Add repeated colors, fonts and spacing as theme variables instead of copying arbitrary values like `bg-[#123456]` across files.
+- v4 renamed several utilities: `shadow-sm` is now `shadow-xs`, `shadow` is `shadow-sm`, `rounded-sm` is `rounded-xs`, `rounded` is `rounded-sm`, `outline-none` is `outline-hidden`, and `ring` is 1px (use `ring-3` for the old default). The default border color is `currentColor`, so always set one.
+- Define custom utilities with `@utility` and variants with `@custom-variant`, for example class-based dark mode: `@custom-variant dark (&:where(.dark, .dark *));`.
+- Write complete class names. Never build them by interpolation (`bg-${color}-500`), because Tailwind only detects literal strings. Map props to full class strings instead.
+- Mobile first: unprefixed classes are the base, and `sm:` / `md:` / `lg:` layer on top. Check 390px-wide layouts for horizontal overflow (`min-w-0` on flex and grid children, `break-words` on long strings).
+
+## shadcn/ui
+- Components live in `components/ui/` and belong to the project. Add them with `npx shadcn@latest add <component>` instead of writing them by hand or installing a second UI kit.
+- Compose instead of forking: wrap a `ui/` component in your own component for app-specific variants. Edit `ui/` files only for project-wide changes.
+- Merge classes with `cn()` from `lib/utils` (clsx + tailwind-merge) so callers can override styles. Define variants with `cva`.
+- Use semantic tokens (`bg-background`, `text-foreground`, `bg-primary`, `text-muted-foreground`, `border-border`) instead of raw palette colors so theming and dark mode keep working. Their values are CSS variables in the global stylesheet, exposed through `@theme inline`.
+- Keep the Radix accessibility intact: don't drop `asChild`, labels, `aria-*` attributes or focus styles. Every icon-only button needs an `aria-label`.
+
+## Accessibility and polish
+- Keep visible focus states (`focus-visible:ring-*`), text contrast of at least 4.5:1, and respect `prefers-reduced-motion` for animation.
+- Give large headings enough line-height that descenders and ascenders on stacked lines never touch. Test with a heading that wraps to two lines.

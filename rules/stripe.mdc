@@ -1,0 +1,34 @@
+---
+description: Stripe payments and subscriptions in Next.js, covering Checkout, verified idempotent webhooks, access gating and the Customer Portal
+globs: **/stripe/**,**/billing/**,**/*webhook*/**,**/pricing/**,**/checkout/**
+alwaysApply: false
+---
+
+# Stripe
+
+## Client and keys
+- Create the Stripe client lazily in a server-only module (for example `getStripe()` in `lib/stripe.ts`) so builds don't fail without keys. `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are server only.
+- Don't set or change `apiVersion` unless the project already pins one. The SDK's default matches its types.
+- Price ids live in server env vars or a server-side plans file (`STRIPE_PRO_PRICE_ID`). The client sends a plan key; the server maps it to a price. Never accept a price id or amount from the request body.
+
+## Checkout
+- Create Checkout Sessions in a Server Action or route handler after checking the user is signed in. Set `client_reference_id` (or `metadata.userId`) to your user id and pass the saved `customer` id when the user already has one.
+- `success_url` is for UX only. Never grant access there. Access changes come from the webhook.
+- Build redirect URLs from a server-side env var such as `APP_URL`, not from the request's `Origin` or `Host` header.
+
+## Webhooks
+- Use a route handler such as `app/api/stripe/webhook/route.ts`. Read the raw body with `await req.text()` (never `req.json()` first) and verify it with `stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET)`. Return 400 when the signature is missing or invalid.
+- Keep it on the Node.js runtime (the default), and exclude the webhook path from auth redirects in `proxy.ts` / `middleware.ts`.
+- Stripe delivers events at least once and in no guaranteed order. Make handlers idempotent: store processed `event.id`s under a unique constraint and skip repeats.
+- Don't write state straight from `event.data.object`; it can be stale by the time it arrives. Take the id, re-fetch the object (`stripe.subscriptions.retrieve(id)`) and save what Stripe says now.
+- Handle at least `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted` and `invoice.payment_failed`.
+- Return 2xx quickly. Thrown errors and non-2xx responses make Stripe retry, so only fail when you want a retry.
+
+## Subscriptions and access
+- Your database mirrors Stripe: store the customer id, subscription id, status, price id and current period end (on newer API versions the period fields live on the subscription item). Only the webhook sync writes these fields.
+- Gate paid features on the server by reading the stored status (`active` or `trialing`), never from a client flag or query string.
+- Send users to the Customer Portal (`stripe.billingPortal.sessions.create`) for plan changes, cancellation, payment methods and invoices instead of building that UI.
+
+## Testing
+- Use test-mode keys locally. Forward events with `stripe listen --forward-to localhost:3000/api/stripe/webhook`, use the `whsec_...` secret it prints, and fire events with `stripe trigger <event>`.
+- Test-mode and live-mode webhook secrets are different. Never commit live keys.

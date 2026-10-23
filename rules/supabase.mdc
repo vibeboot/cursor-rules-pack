@@ -1,0 +1,32 @@
+---
+description: Supabase in Next.js with @supabase/ssr clients, server-side auth checks, Row Level Security, migrations and generated types
+globs: **/supabase/**,**/lib/supabase/**,**/utils/supabase/**,**/proxy.ts,**/middleware.ts
+alwaysApply: false
+---
+
+# Supabase
+
+## Clients
+- Use `@supabase/ssr`: `createBrowserClient` in client components, and `createServerClient` with the Next.js `cookies()` store in Server Components, Server Actions and route handlers. Implement only the `getAll` and `setAll` cookie methods. Don't use the deprecated `@supabase/auth-helpers-nextjs`.
+- Create a new server client for each request. Never cache one in a module-level variable.
+- Refresh the session in `proxy.ts` (Next.js 16) or `middleware.ts` (15) as shown in Supabase's Next.js guide, and return the response object it builds so the refreshed cookies are kept.
+- The publishable key (formerly the anon key) may be public via a `NEXT_PUBLIC_` variable. The secret / `service_role` key bypasses RLS: server only, never `NEXT_PUBLIC_`, and only for admin jobs and webhooks, never for code acting on behalf of a signed-in user.
+
+## Auth checks
+- On the server, authorize with `supabase.auth.getClaims()` (verifies the JWT) or `supabase.auth.getUser()` (asks the Auth server). Never trust `getSession()` on the server: it reads the cookie without verifying it.
+- Protect pages inside the page, action or route handler (redirect when there's no user). The proxy only refreshes sessions and does optimistic redirects.
+
+## Row Level Security
+- Every table in an exposed schema (such as `public`) has RLS enabled, with explicit policies per operation (`select`, `insert`, `update`, `delete`). No table ships with RLS off.
+- Policies compare an owner column to `(select auth.uid())`. Wrapping it in `select` lets Postgres evaluate it once per query. Index the columns your policies filter on.
+- `update` policies need both `using` and `with check`, so a user can't move a row to someone else.
+- Don't base authorization on `user_metadata`, because users can edit it. Use `app_metadata` or your own tables.
+- Even with RLS, filter in code too (`.eq("user_id", user.id)`). It's clearer and faster.
+
+## Schema and types
+- Change the schema with migrations in `supabase/migrations/` (`supabase migration new <name>`), not by clicking in the dashboard. Never edit a migration that has already run in production.
+- Regenerate types after every schema change (`supabase gen types typescript --local > lib/database.types.ts`, or `--project-id <id>`) and pass `Database` to the client generics.
+- Always handle `error` from `{ data, error }` before using `data`.
+
+## Storage
+- Buckets are private unless the files are truly public. Scope object paths to the user (for example `<user id>/<file>`) with storage policies, and use signed URLs for private downloads.
