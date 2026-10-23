@@ -1,0 +1,17 @@
+---
+description: How the agent plans, edits and verifies changes in this repo
+globs:
+alwaysApply: true
+---
+
+# Working agreement
+
+- Read before you write. Open the files you're about to change and the closest existing example of the same pattern (another route, component or action), then follow that pattern instead of inventing a new one.
+- For changes that touch more than two files or change structure, write a short plan first (files, approach, risks), then implement it.
+- Keep diffs scoped to the task. Don't reformat, rename or "clean up" unrelated code, and don't delete comments or tests you didn't add.
+- Ask before adding a dependency: say what it's for and why an installed package or a few lines of code won't do. Use the package manager that matches the lockfile (`package-lock.json` npm, `pnpm-lock.yaml` pnpm, `bun.lock` bun, `yarn.lock` yarn).
+- Check the installed version in `package.json` before using a library API. If your memory of an API disagrees with the installed types, the installed version wins.
+- Never invent env vars, routes, table names or API fields. Search the codebase first. If something really doesn't exist yet, say so and propose it.
+- Stop and ask one specific question before anything destructive or hard to undo: deleting data, migrations, auth or billing changes, renaming public URLs.
+- Before you say "done", run the typecheck, lint, test and build scripts that exist in `package.json`, fix what fails, and report what you ran. If you couldn't run something, say so.
+- End with a short summary: what changed and where, plus anything a human must do (new env var, migration, dashboard setting).

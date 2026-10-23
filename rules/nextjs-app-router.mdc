@@ -1,0 +1,36 @@
+---
+description: Next.js App Router conventions for Server Components, Server Actions, caching, proxy and metadata
+globs: **/app/**,**/components/**,**/proxy.ts,**/middleware.ts,next.config.*
+alwaysApply: false
+---
+
+# Next.js App Router
+
+Check `next` in `package.json`. These rules target Next.js 15 and 16. Items marked (16) apply only to Next.js 16 and later.
+
+## Server and client components
+- Components are Server Components by default. Add `"use client"` only to the smallest component that needs state, effects, event handlers or browser APIs, and keep it a leaf. Pass server-rendered content into it as `children` instead of turning a parent into a client component.
+- Fetch data in Server Components with `async`/`await`, not with `useEffect` + `fetch`. Pass only serializable props from server to client (plain objects, arrays, primitives, Dates; no class instances, and no functions other than Server Actions).
+- Never import a server-only module (database client, secret-reading helper) into a client component.
+
+## Files and routing
+- Routes are `app/**/page.tsx`. Shared shells are `layout.tsx`. States are `loading.tsx`, `error.tsx` (must be a client component) and `not-found.tsx`. HTTP endpoints are `app/**/route.ts`.
+- Don't use Pages Router APIs (`getServerSideProps`, `getStaticProps`, `next/router`, `pages/api`) in `app/`. Use `next/navigation` (`useRouter`, `usePathname`, `redirect`, `notFound`).
+- `params` and `searchParams` are Promises in pages, layouts, route handlers and `generateMetadata`: `const { slug } = await params`. `cookies()`, `headers()` and `draftMode()` are async too.
+- (16) `middleware.ts` is now `proxy.ts` and exports `proxy`. Use it for redirects, rewrites and cheap cookie checks only. It is not an authorization layer: re-check auth in the page, action or route handler.
+
+## Mutations
+- Use Server Actions (`"use server"`) for mutations from your own UI. Use route handlers for webhooks, third-party callers and streaming responses.
+- In every action: authenticate, authorize, validate input, then mutate. Return a typed result (`{ ok: true } | { ok: false; error: string }`) for expected failures instead of throwing.
+- After a mutation, refresh what changed: `revalidatePath("/path")`, or for tagged data `updateTag("tag")` inside a Server Action (16) or `revalidateTag("tag", "max")` (16 requires the second argument). `redirect()` works by throwing, so call it outside `try`/`catch`.
+- Use `useActionState` for form state and `useFormStatus` for pending buttons.
+
+## Caching and rendering
+- Since Next.js 15, `fetch` requests and GET route handlers are not cached by default. Opt in deliberately.
+- Don't add `export const dynamic = "force-dynamic"` just to silence an error. Find what makes the route dynamic (cookies, headers, uncached data) and decide on purpose.
+- (16) If `cacheComponents` is enabled in `next.config`, mark cacheable work with `"use cache"` plus `cacheLife()` / `cacheTag()`, and wrap request-time data (cookies, session, per-user queries) in `<Suspense>`.
+
+## Pages and assets
+- Use the Metadata API (`export const metadata` or `generateMetadata`) for titles, descriptions and Open Graph, not hand-written `<head>` tags.
+- Internal links use `next/link`. Images use `next/image` with `width`/`height` or `fill` + `sizes`. Fonts use `next/font`.
+- `NEXT_PUBLIC_*` values are inlined at build time, so changing one requires a rebuild.

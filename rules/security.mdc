@@ -1,0 +1,27 @@
+---
+description: Security guardrails for secrets, untrusted input, authorization, logging and redirects
+globs:
+alwaysApply: true
+---
+
+# Security guardrails
+
+## Secrets
+- Read secrets only in server code via `process.env`. Anything prefixed `NEXT_PUBLIC_` is inlined into the browser bundle at build time, so never give a secret that prefix.
+- Never hardcode keys, tokens or passwords, not even temporarily or in tests. Never commit `.env*` files. Document every new variable in `.env.example` with a placeholder and a one-line comment.
+- Modules that read secrets or talk to the database start with `import "server-only"` so they can't end up in a client bundle.
+
+## Trust boundaries
+- Treat everything from the client as untrusted: form data, JSON bodies, `params`, `searchParams`, headers, cookies, webhook payloads and LLM output. Validate shape and size on the server (Zod `safeParse` or equivalent) before using it.
+- Every Server Action and route handler is a public HTTP endpoint. Check authentication and authorization inside each one, even if the UI hides the button.
+- Authorize by ownership: load records scoped to the signed-in user (`where: { id, userId }`), not by id alone. Return 404 for records the user doesn't own.
+- Prices, plans, roles and credits are decided on the server from your database or payment provider, never from a value the client sends.
+
+## Output and logging
+- Don't render untrusted HTML. Avoid `dangerouslySetInnerHTML`; if it's unavoidable, sanitize with a maintained library.
+- Don't log secrets, tokens, cookies, full request or webhook bodies, or personal data. Log ids and event types.
+- Errors sent to the client are generic. Details go to server logs.
+
+## Redirects and server-side fetches
+- Only redirect to relative paths or an allowlist of hosts. `?next=` and `?redirect=` params are classic open redirects.
+- Don't `fetch()` a user-supplied URL from the server without an allowlist (SSRF).

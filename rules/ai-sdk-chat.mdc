@@ -1,0 +1,34 @@
+---
+description: Vercel AI SDK chat apps, covering streamText route handlers, useChat, tools, structured output, cost limits and abuse protection
+globs: **/api/chat/**,**/ai/**,**/chat/**,**/agents/**
+alwaysApply: false
+---
+
+# AI SDK chat
+
+Check `ai` in `package.json`. These rules target AI SDK 5 and later (UIMessage-based `useChat`). Code that uses `toDataStreamResponse`, `maxSteps`, `maxTokens` or `parameters:` in tools is v4-era: don't mix the two styles.
+
+## Route handler
+- The chat endpoint is a route handler (`app/api/chat/route.ts`, `export async function POST`). Authenticate first, then validate the body (message count, total length) before calling a model.
+- Convert UI messages before calling the model: `streamText({ model, system, messages: await convertToModelMessages(messages) })`. It's async from v6 on; awaiting it is harmless in v5. Return `result.toUIMessageStreamResponse()` for `useChat`.
+- Keep the system prompt, model id, tool list and `maxOutputTokens` on the server. The client may send a mode or persona key that the server maps to settings, never the settings themselves.
+- Forward cancellation with `abortSignal: req.signal` so a closed tab or Stop button stops the token spend.
+- Set `maxOutputTokens` and cap the history you resend (last N messages or a token budget).
+- On Vercel, set `export const maxDuration` on long-running streaming routes to what your plan allows.
+
+## Client
+- Use `useChat` from `@ai-sdk/react`. Since v5 it doesn't manage the input field: keep `const [input, setInput] = useState("")` and call `sendMessage({ text: input })`.
+- Render `message.parts` (text, reasoning, tool parts), not a `content` string. Render model text with a Markdown renderer that doesn't allow raw HTML.
+- Use `status` (`submitted`, `streaming`, `ready`, `error`) for UI state and wire `stop()` to a Stop button.
+
+## Tools and structured output
+- Define tools with `tool({ description, inputSchema: z.object({...}), execute })`. `execute` runs on the server with the user's permissions, so re-check authorization inside it and validate everything it touches.
+- Multi-step tool loops need an explicit stop condition, for example `stopWhen: stepCountIs(5)`.
+- For JSON, use a schema: `generateText` / `streamText` with `output: Output.object({ schema })` (v6 and later; `generateObject` in v5). Handle validation failures.
+- Model output is untrusted. Never `eval` it, run it as SQL, or use it as a URL or redirect without validation.
+
+## Cost and limits
+- Enforce per-user quotas on the server before calling the model (an atomic counter in the database), and rate-limit anonymous endpoints. A counter in the UI is cosmetic.
+- Provider keys come from server env only. Choose models per plan on the server, for example a cheaper model for free users.
+- Persist conversations scoped to `userId` and load them by `{ id, userId }`.
+- Record token usage per user from `onFinish` so you know what each customer costs you.
