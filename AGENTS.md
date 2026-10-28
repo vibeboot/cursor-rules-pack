@@ -1,7 +1,7 @@
 # AGENTS.md
 
 <!--
-  VibeBoot Cursor Rules Pack v1.0.0 (https://vibeboot.dev/tools/cursor-rules-pack)
+  VibeBoot Cursor Rules Pack v1.1.0 (https://vibeboot.dev/tools/cursor-rules-pack)
   Replace every <placeholder>, delete lines that don't apply, and keep this file short.
   Agents read it on every task, so only write down what they can't figure out from the code.
 -->
@@ -53,4 +53,4 @@ Instructions for AI coding agents (Cursor, Claude Code, Codex, Copilot and other
 - <Project-specific landmines, e.g. "never grant Pro access outside the Stripe webhook".>
 
 ## Scoped rules
-Detailed rules live in `.cursor/rules/*.mdc`: workflow, security, Next.js, Supabase, Stripe, Tailwind + shadcn/ui and AI SDK. Cursor attaches them automatically. Other agents: read the matching file before working in that area (for example `stripe.mdc` before touching billing).
+Detailed rules live in `.cursor/rules/*.mdc`: workflow, security, access control, Next.js, Supabase, Stripe, Stripe webhooks, Tailwind + shadcn/ui and AI SDK. Cursor attaches them automatically. Other agents: read the matching file before working in that area (for example `stripe.mdc` and `stripe-webhooks.mdc` before touching billing).

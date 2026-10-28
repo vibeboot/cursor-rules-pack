@@ -1,4 +1,4 @@
-# VibeBoot Cursor Rules Pack
+# VibeBoot Cursor Rules Pack v1.1.0
 
 A free set of Cursor project rules, plus an `AGENTS.md` template and a `CLAUDE.md`, for Next.js apps built with AI coding agents (Cursor, Claude Code, and other agents that read `AGENTS.md`).
 
@@ -22,13 +22,17 @@ Project page: https://vibeboot.dev/tools/cursor-rules-pack
 | --- | --- |
 | `rules/00-workflow.mdc` | How the agent plans, edits and verifies changes (always applied). |
 | `rules/security.mdc` | Guardrails for secrets, untrusted input, authorization, logging and redirects (always applied). |
+| `rules/access-control.mdc` | Session checks in every Server Action and route handler, owner-scoped reads and writes, 404 for other users' records, roles and plans from the database. |
 | `rules/nextjs-app-router.mdc` | App Router conventions: Server Components, Server Actions, caching, proxy and metadata. |
 | `rules/supabase.mdc` | `@supabase/ssr` clients, server-side auth checks, Row Level Security, migrations and generated types. |
 | `rules/stripe.mdc` | Stripe Checkout, verified idempotent webhooks, access gating and the Customer Portal. |
+| `rules/stripe-webhooks.mdc` | Raw-body signature verification, one `whsec_` secret per environment, test vs live keys, duplicate and out-of-order events, Stripe CLI replay. |
 | `rules/tailwind-shadcn.mdc` | Tailwind CSS v4 and shadcn/ui: CSS-first theme, v4 class renames, semantic tokens and `cn()`. |
 | `rules/ai-sdk-chat.mdc` | Vercel AI SDK chat: `streamText` route handlers, `useChat`, tools, structured output, cost limits and abuse protection. |
 
 Also included: `AGENTS.md` (agent instructions template) and `CLAUDE.md` (imports `AGENTS.md` for Claude Code).
+
+What changed: see [CHANGELOG.md](CHANGELOG.md).
 
 ## More from VibeBoot
 
