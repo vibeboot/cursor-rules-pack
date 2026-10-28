@@ -1,0 +1,26 @@
+---
+description: Server-side access control for Server Actions, route handlers and data access, covering ownership checks, roles, plan gating and IDOR-safe updates and deletes
+globs: **/app/**,**/actions/**,**/lib/**,**/server/**
+alwaysApply: false
+---
+
+# Access control
+
+## Decide on the server, every time
+- Every Server Action, route handler and page that reads private data checks the session itself. Hiding a button, a client-side redirect or a check in `proxy.ts` / `middleware.ts` is not access control.
+- Use one server-only helper (for example `requireUser()` in `lib/auth.ts`) that returns the signed-in user or throws/redirects. Call it at the top of each action and handler instead of re-implementing the check.
+- Take the user id from the verified session, never from the request body, a form field, a query string or a header.
+
+## Ownership on every query
+- Scope reads to the owner: `findFirst({ where: { id, userId: user.id } })`, not `findUnique({ where: { id } })` followed by nothing. If nothing comes back, return 404 (not 403) so ids can't be probed.
+- Scope writes the same way. Use `updateMany` / `deleteMany` with `{ id, userId: user.id }` and check that `count` is 1, or load the owned record first and then update it by id.
+- List endpoints filter by owner (or team) in the query itself. Never fetch everything and filter in the client.
+- With Supabase, Row Level Security policies are the ownership check. Keep them on every table, and don't use the service-role key in code that serves a user request.
+
+## Roles and plans
+- Roles (`admin`, `owner`, `member`) and plan status (`active`, `trialing`) are read from your database on the server. Never trust a role, plan or price sent by the client, and never store them only in a client-readable cookie or `localStorage`.
+- Gate paid features where the work happens (the action or route handler), not only in the UI.
+- Admin pages and routes check the admin role on the server and return 404 to everyone else.
+
+## Prove it
+- For each new action or route, test as a signed-out user, as a different signed-in user using the first user's record id, and as a free user hitting a paid feature. All three must fail without changing data.

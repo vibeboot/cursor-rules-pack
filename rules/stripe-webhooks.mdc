@@ -1,0 +1,31 @@
+---
+description: Stripe webhook route handlers in Next.js, covering raw-body signature checks, per-environment whsec_ secrets, test vs live keys, duplicate and out-of-order events, and local replay with the Stripe CLI
+globs: **/*webhook*/**,**/api/stripe/**,**/stripe/**
+alwaysApply: false
+---
+
+# Stripe webhooks
+
+## Verify the raw body
+- One route handler, for example `app/api/stripe/webhook/route.ts`, exporting `POST`. Read the body once with `const body = await req.text()`. Never call `req.json()` (or parse and re-stringify) before verifying: any change to the bytes breaks the signature.
+- Read the header with `req.headers.get("stripe-signature")`. If it's missing, return 400 without touching the database.
+- Verify with `stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET!)` inside `try`/`catch`. On failure return 400 and log only the error message, never the body.
+- Keep the handler on the Node.js runtime (the default). Don't add `export const runtime = "edge"` to it.
+- Exclude the webhook path from auth redirects, locale rewrites and trailing-slash redirects in `proxy.ts` / `middleware.ts` and `next.config`. Stripe doesn't follow 3xx redirects, and a 401 or 404 from your auth layer counts as a failed delivery.
+
+## One secret per endpoint and mode
+- Every webhook endpoint has its own `whsec_...` signing secret. The one printed by `stripe listen` is only for local forwarding. Each Dashboard endpoint (staging, production) has a different one. Set `STRIPE_WEBHOOK_SECRET` separately in each environment and never copy one environment's value into another.
+- Test mode and live mode are separate: `sk_test_` keys go with a test-mode endpoint's secret, `sk_live_` keys with a live endpoint's secret. Never mix a test key with a live secret or the other way round, and never commit live keys.
+- When you add or rename a webhook env var, add it to `.env.example` with a comment saying where the value comes from (`stripe listen` locally, Dashboard > Developers > Webhooks in production).
+- In production, make sure the endpoint is subscribed to every event type the handler switches on. Unsubscribed events are never sent.
+
+## Duplicates and order
+- Stripe delivers events at least once and doesn't guarantee order. A retried or resent event has the same `event.id`.
+- Record each processed `event.id` in a table with a unique constraint. Insert it in the same transaction as the state change. If the insert hits the unique constraint, the event was already handled: return 200 and do nothing else.
+- Don't trust the order events arrive in, and don't write state straight from `event.data.object`. Take the object id, re-fetch it (`stripe.subscriptions.retrieve(id)`, `stripe.checkout.sessions.retrieve(id)`) and save what Stripe says now. Then an older event that arrives late can't overwrite newer state.
+- Return 2xx once the event is stored or handled. Do slow work (emails, provisioning) after you record the event, or in a background job, so the response isn't late. Throw or return 5xx only when you want Stripe to retry.
+
+## Replay before you call it fixed
+- Locally: run `stripe listen --forward-to localhost:3000/api/stripe/webhook`, put the `whsec_...` it prints in `.env.local`, restart the dev server, then fire a real test event with `stripe trigger checkout.session.completed` (or `customer.subscription.updated`, `invoice.payment_failed`).
+- Replay a specific event with `stripe events resend evt_...` while `stripe listen` is running. Run it twice to prove a duplicate is skipped.
+- Done means: `stripe listen` shows `[200]` for every event, the database row changed once, and the second resend changed nothing.

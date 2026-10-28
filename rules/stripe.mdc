@@ -17,12 +17,8 @@ alwaysApply: false
 - Build redirect URLs from a server-side env var such as `APP_URL`, not from the request's `Origin` or `Host` header.
 
 ## Webhooks
-- Use a route handler such as `app/api/stripe/webhook/route.ts`. Read the raw body with `await req.text()` (never `req.json()` first) and verify it with `stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET)`. Return 400 when the signature is missing or invalid.
-- Keep it on the Node.js runtime (the default), and exclude the webhook path from auth redirects in `proxy.ts` / `middleware.ts`.
-- Stripe delivers events at least once and in no guaranteed order. Make handlers idempotent: store processed `event.id`s under a unique constraint and skip repeats.
-- Don't write state straight from `event.data.object`; it can be stale by the time it arrives. Take the id, re-fetch the object (`stripe.subscriptions.retrieve(id)`) and save what Stripe says now.
-- Handle at least `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted` and `invoice.payment_failed`.
-- Return 2xx quickly. Thrown errors and non-2xx responses make Stripe retry, so only fail when you want a retry.
+- Webhook handling (raw-body verification, `whsec_` secrets per environment, test vs live keys, duplicate and out-of-order events, Stripe CLI replay) lives in `stripe-webhooks.mdc`. Read it before touching the webhook route.
+- Handle at least `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted` and `invoice.payment_failed`, and sync your database from the re-fetched subscription.
 
 ## Subscriptions and access
 - Your database mirrors Stripe: store the customer id, subscription id, status, price id and current period end (on newer API versions the period fields live on the subscription item). Only the webhook sync writes these fields.
@@ -30,5 +26,5 @@ alwaysApply: false
 - Send users to the Customer Portal (`stripe.billingPortal.sessions.create`) for plan changes, cancellation, payment methods and invoices instead of building that UI.
 
 ## Testing
-- Use test-mode keys locally. Forward events with `stripe listen --forward-to localhost:3000/api/stripe/webhook`, use the `whsec_...` secret it prints, and fire events with `stripe trigger <event>`.
-- Test-mode and live-mode webhook secrets are different. Never commit live keys.
+- Use test-mode keys locally and in previews. Live keys only exist in the production environment.
+- Forward and replay events with the Stripe CLI as described in `stripe-webhooks.mdc` before calling a billing change done.
