@@ -1,6 +1,5 @@
 ---
 description: Security guardrails for secrets, untrusted input, authorization, logging and redirects
-globs:
 alwaysApply: true
 ---
 
